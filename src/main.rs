@@ -1,9 +1,7 @@
 // A very simple ray tracer by Bourbon
 // Assume BSD-style license
 
-use std::thread;
-
-use image::{ColorType, ImageBuffer, RgbaImage};
+use image::{ImageBuffer, RgbaImage};
 
 // Global constants
 // u32 for compatibility.
@@ -42,7 +40,7 @@ impl Vector3D {
     // Clone `original_vector` into new vector `self`
     // original_vector <---- self
     // This is only because I was too lazy to implement `Clone` or `Copy`.
-    fn v3d_clone_from(&mut self, original_vector: Vector3D) {
+    fn _v3d_clone_from(&mut self, original_vector: Vector3D) {
         self.x = original_vector.x;
         self.y = original_vector.y;
         self.z = original_vector.z;
@@ -50,7 +48,7 @@ impl Vector3D {
 
     // Print vector
     // We could use `impl Display` but hey! :)
-    fn v3d_print(&self) {
+    fn _v3d_print(&self) {
         println!("x: {} y: {} z: {}", self.x, self.y, self.z);
     }
 
@@ -88,7 +86,7 @@ impl Vector3D {
     }
 
     // Cross multiplication
-    fn v3d_cross_mul(&mut self, b: Vector3D, c: Vector3D) {
+    fn _v3d_cross_mul(&mut self, b: Vector3D, c: Vector3D) {
         self.x = b.y * c.z - b.z * c.y;
         self.y = b.z * c.x - b.x * c.z;
         self.z = b.x * c.y - b.y * c.x;
@@ -100,7 +98,7 @@ impl Vector3D {
     }
 
     // Length of but without sqrt
-    fn v3d_length_sqr(&self) -> f64 {
+    fn _v3d_length_sqr(&self) -> f64 {
         self.x * self.x + self.y * self.y + self.z * self.z
     }
 
@@ -487,4 +485,6 @@ fn main() {
 
 
     println!("Writing test.png image...");
+    globals.img.save("test.png").unwrap();
 }
+
