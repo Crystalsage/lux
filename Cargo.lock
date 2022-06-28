@@ -309,6 +309,7 @@ name = "lux"
 version = "0.1.0"
 dependencies = [
  "image",
+ "lazy_static",
 ]
 
 [[package]]
