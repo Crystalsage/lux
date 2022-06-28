@@ -131,6 +131,7 @@ struct PrimSphere {
 }
 
 // Light ray
+#[derive(Copy, Clone)]
 struct Ray {
     direction: Vector3D,
     origin: Vector3D,
@@ -225,11 +226,11 @@ fn add_light(pos: Vector3D, color: Vector3D, globals: &mut GlobalSettings) {
 fn trace(ray: Ray, refl_depth: u32, globals: &mut GlobalSettings) -> Vector3D{
     let mut color: Vector3D = Vector3D::v3d_new((0.02, 0.1, 0.17));
 
-		let dist: f64 = 1000000000.0;
-		let mut prim: Option<PrimSphere>;
+		let mut dist: f64 = 1000000000.0;
+		let mut prim: Option<PrimSphere> = None;
 
 		for i in 0..globals.primitive_count {
-			let mut temp_dist: f64 = 0.0;
+			let temp_dist: f64 = 0.0;
 			let p = globals.primitive_list[i as usize];
 
 			let res = p.intersect(ray, temp_dist);
@@ -267,7 +268,7 @@ fn trace(ray: Ray, refl_depth: u32, globals: &mut GlobalSettings) -> Vector3D{
 		let prim_color: Vector3D = prim.m.color;
 
 		for i in 0..globals.light_count {
-			let light_iter = globals.light_list[i as usize];
+			let light_iter = &globals.light_list[i as usize];
 
 			let mut l: Vector3D = light_iter.position;
 			l.v3d_sub(pi);
@@ -280,7 +281,7 @@ fn trace(ray: Ray, refl_depth: u32, globals: &mut GlobalSettings) -> Vector3D{
 				if dot > 0.0 {
 					let diff = dot * prim.m.diffusive;
 
-					let color_add = light_iter.color;
+					let mut color_add = light_iter.color;
 					color_add.v3d_mul_v3d(prim_color);
 					color_add.v3d_mul_scalar(diff);
 					color.v3d_add(color_add);
@@ -291,19 +292,20 @@ fn trace(ray: Ray, refl_depth: u32, globals: &mut GlobalSettings) -> Vector3D{
 				if prim.m.specular > 0.0 {
 					//FIXME: Maybe this is messed up.
 
-					let r1: Vector3D = n;
+					let mut r1: Vector3D = n;
 					let r2: f64 = l.v3d_dot_mul(n) * 2.0;
-					let r: Vector3D = l;
+                    r1.v3d_mul_scalar(r2);
+					let mut r: Vector3D = l;
 					r.v3d_sub(r1);
 
-					let dot: f64 = ray.direction.v3d_dot_mul(r);
+					let mut dot: f64 = ray.direction.v3d_dot_mul(r);
 					if dot > 0.0 {
 						dot *= dot;
 						dot *= dot;
 						dot *= dot;
 						let spec = dot * prim.m.specular;
 
-						let color_add = light_iter.color;
+						let mut color_add = light_iter.color;
 						color_add.v3d_mul_scalar(spec);
 						color_add.v3d_add(color_add);
 					}
@@ -315,20 +317,14 @@ fn trace(ray: Ray, refl_depth: u32, globals: &mut GlobalSettings) -> Vector3D{
 					prim.normal(pi);
 
 
-					let r: Vector3D = ray.direction;
-					let r1: Vector3D = n;
+					let mut r: Vector3D = ray.direction;
+					let mut r1: Vector3D = n;
 
 					let r2 = ray.direction.v3d_dot_mul(n) * 2.0;
 					r1.v3d_mul_scalar(r2);
 					r.v3d_sub(r1);
 
-					let rcol = Vector3D {
-						x: 0.0,
-						y: 0.0,
-						z: 0.0,
-					};
-
-					let newpi: Vector3D = r;
+					let mut newpi: Vector3D = r;
 					newpi.v3d_mul_scalar(0.0001);
 					newpi.v3d_add(pi);
 
@@ -337,7 +333,7 @@ fn trace(ray: Ray, refl_depth: u32, globals: &mut GlobalSettings) -> Vector3D{
 						direction: r,
 					};
 
-					let rcol:Vector3D = trace(tempr, refl_depth +1, globals);
+					let mut rcol:Vector3D = trace(tempr, refl_depth +1, globals);
 
 					rcol.v3d_mul_scalar(refl);
 					rcol.v3d_mul_v3d(prim_color);
@@ -358,26 +354,21 @@ fn trace(ray: Ray, refl_depth: u32, globals: &mut GlobalSettings) -> Vector3D{
 fn render(thread_id: u32, globals: &mut GlobalSettings) {
     let camerapos = Vector3D::v3d_new((0.0, 0.0, -5.0));
 
-    let img: &mut RgbaImage = &mut globals.img;
-
     let wx1: f64 = -2.0;
     let wx2: f64 = 2.0;
     let wy1: f64 = 1.5;
     let wy2: f64 = -1.5;
 
-    let dx: f64 = (wx2 - wx1) as f64 / (img.width()) as f64;
-    let dy: f64 = (wy2 - wy1) as f64 / (img.height()) as f64;
+    let dx: f64 = (wx2 - wx1) as f64 / (globals.img.width()) as f64;
+    let dy: f64 = (wy2 - wy1) as f64 / (globals.img.height()) as f64;
 
     let mut sx: f64 = wx1;
     let mut sy: f64 = wy1 + dy * (thread_id as f64);
 
-    let x: u32;
-    let y: u32;
-
-    for y in (thread_id..img.height()).step_by(MAXTHREADS as usize) {
+    for y in (thread_id..globals.img.height()).step_by(MAXTHREADS as usize) {
         sx = wx1;
 
-        for x in 0..img.width() {
+        for x in 0..globals.img.width() {
             let camera_target = Vector3D::v3d_new((sx, sx, 0.0));
 
             let mut ray = Ray {
@@ -389,37 +380,12 @@ fn render(thread_id: u32, globals: &mut GlobalSettings) {
             ray.direction.v3d_norm();
 
             let color: Vector3D = trace(ray, 0, globals);
-            let mut r: u8 = (color.x * 255.0) as u8;
-            let mut g: u8 = (color.y * 255.0) as u8;
-            let mut b: u8 = (color.z * 255.0) as u8;
-
-            r = match r {
-                r if r > 255 => 255,
-                r if r < 0 => 0,
-                _ => {
-                    panic!()
-                }
-            };
-
-            g = match g {
-                g if g > 255 => 255,
-                g if g < 0 => 0,
-                _ => {
-                    panic!()
-                }
-            };
-
-            b = match b {
-                b if b > 255 => 255,
-                b if b < 0 => 0,
-                _ => {
-                    panic!()
-                }
-            };
+            let r: u8 = (color.x * 255.0) as u8;
+            let g: u8 = (color.y * 255.0) as u8;
+            let b: u8 = (color.z * 255.0) as u8;
 
             let cl: image::Rgba<u8> = image::Rgba([r, g, b, 255]);
-
-            img.put_pixel(y, x, cl);
+            globals.img.put_pixel(x, y, cl);
 
             sx += dx;
         }
@@ -512,11 +478,13 @@ fn main() {
     add_light(lightpos, lightcolor, &mut globals);
 
     println!("Rendering...\n");
+    // Simulating 4 threads. Each 'thread' (call) completes a part of the image. 
+    // FIXME: Actually implement threads! :')
+    render(0, &mut globals);
+    render(1, &mut globals);
+    render(2, &mut globals);
+    render(3, &mut globals);
 
-    for i in 0..MAXTHREADS {
-        println!("Thread {} started", i);
-        thread::spawn(move || {
-            render(i, &mut globals);
-        });
-    }
+
+    println!("Writing test.png image...");
 }
