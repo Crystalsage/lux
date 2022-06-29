@@ -112,7 +112,7 @@ impl Vector3D {
 }
 
 // Material properties and color
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 struct Material {
     specular: f64,
     diffusive: f64,
@@ -121,7 +121,7 @@ struct Material {
 }
 
 // Sphere
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 struct PrimSphere {
     position: Vector3D,
     radius: f64,
@@ -135,7 +135,7 @@ struct Ray {
     origin: Vector3D,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 // Light source
 struct Light {
     position: Vector3D,
@@ -165,18 +165,16 @@ impl PrimSphere{
 		return ret;
 	}
 
-	fn intersect(&self, ray: Ray, dist: f64) -> u32 {
+	fn intersect(&self, ray: Ray, dist: &mut f64) -> i32 {
 		let mut v_precalc = ray.origin;
 		v_precalc.v3d_sub(self.position);
-
-		let mut dist = dist;
 
 		let det_precalc: f64 = self.radius * self.radius - v_precalc.v3d_dot_mul(v_precalc);
 
 		let b = - v_precalc.v3d_dot_mul(ray.direction);
 		let mut det = b*b + det_precalc;
 
-		let mut retval: u32 = 0;
+		let mut retval: i32 = 0;
 
 		if det > 0.0 {
 			det = det.sqrt();
@@ -184,11 +182,11 @@ impl PrimSphere{
 			let i2 = b + det;
 
 			if i2 > 0.0 && i1 < 0.0 {
-				retval = 1;
-				dist = i2;
+				retval = -1;
+				*dist = i2;
 			} else if i2 > 0.0 && i1 >= 0.0 {
 				retval = 1;
-				dist = i1;
+				*dist = i1;
 			}
 		}
 
@@ -219,8 +217,6 @@ fn add_light(pos: Vector3D, color: Vector3D, globals: &mut GlobalSettings) {
         globals.light_list.push(l);
         globals.light_count += 1;
     }
-    dbg!(globals.light_count);
-    println!("{:?}", globals.light_list);
 }
 
 fn trace(ray: Ray, refl_depth: u32, globals: &mut GlobalSettings) -> Vector3D{
@@ -230,10 +226,10 @@ fn trace(ray: Ray, refl_depth: u32, globals: &mut GlobalSettings) -> Vector3D{
 		let mut prim: Option<PrimSphere> = None;
 
 		for i in 0..globals.primitive_count {
-			let temp_dist: f64 = 0.0;
+			let mut temp_dist: f64 = 0.0;
 			let p = globals.primitive_list[i as usize];
 
-			let res = p.intersect(ray, temp_dist);
+			let res = p.intersect(ray, &mut temp_dist);
 
 			if res == 0 {
 				continue;
@@ -455,11 +451,11 @@ fn main() {
 
             match sphere_pos_map[j][i] {
                 'g' => {
-                    z += -0.5;
+                    z += -0.5 - sn * 0.4;
                     m = &green;
                 }
                 'r' => {
-                    z += -0.5;
+                    z += -0.5 - sn * 0.4;
                     m = &red;
                 }
 
