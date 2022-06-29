@@ -135,7 +135,7 @@ struct Ray {
     origin: Vector3D,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 // Light source
 struct Light {
     position: Vector3D,
@@ -219,6 +219,8 @@ fn add_light(pos: Vector3D, color: Vector3D, globals: &mut GlobalSettings) {
         globals.light_list.push(l);
         globals.light_count += 1;
     }
+    dbg!(globals.light_count);
+    println!("{:?}", globals.light_list);
 }
 
 fn trace(ray: Ray, refl_depth: u32, globals: &mut GlobalSettings) -> Vector3D{
@@ -367,7 +369,7 @@ fn render(thread_id: u32, globals: &mut GlobalSettings) {
         sx = wx1;
 
         for x in 0..globals.img.width() {
-            let camera_target = Vector3D::v3d_new((sx, sx, 0.0));
+            let camera_target = Vector3D::v3d_new((sx, sy, 0.0));
 
             let mut ray = Ray {
                 origin: camerapos,
