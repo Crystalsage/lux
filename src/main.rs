@@ -4,7 +4,7 @@
 use image::{ImageBuffer, RgbaImage};
 
 // Global constants
-// u32 for compatibility.
+// `u32` for compatibility with 
 const RESX: u32 = 1024;
 const RESY: u32 = 768;
 const MAXPRIMCOUNT: u32 = 64;
@@ -112,7 +112,7 @@ impl Vector3D {
 }
 
 // Material properties and color
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 struct Material {
     specular: f64,
     diffusive: f64,
@@ -121,7 +121,7 @@ struct Material {
 }
 
 // Sphere
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone)]
 struct PrimSphere {
     position: Vector3D,
     radius: f64,
@@ -135,7 +135,7 @@ struct Ray {
     origin: Vector3D,
 }
 
-#[derive(Clone)]
+#[derive(Copy, Debug, Clone)]
 // Light source
 struct Light {
     position: Vector3D,
@@ -194,6 +194,7 @@ impl PrimSphere{
 	}
 }
 
+// Spawn a sphere at the specified position `pos`.
 fn add_sphere(pos: &Vector3D, rad: f64, m: &Material, globals: &mut GlobalSettings) {
     if globals.primitive_count < MAXPRIMCOUNT {
         let p = PrimSphere {
@@ -219,150 +220,149 @@ fn add_light(pos: Vector3D, color: Vector3D, globals: &mut GlobalSettings) {
     }
 }
 
-fn trace(ray: Ray, refl_depth: u32, globals: &mut GlobalSettings) -> Vector3D{
+fn trace(ray: &Ray, refl_depth: u32, globals: &mut GlobalSettings) -> Vector3D{
     let mut color: Vector3D = Vector3D::v3d_new((0.02, 0.1, 0.17));
 
-		let mut dist: f64 = 1000000000.0;
-		let mut prim: Option<PrimSphere> = None;
+    let mut dist: f64 = 1000000000.0;
+    let mut prim: Option<PrimSphere> = None;
 
-		for i in 0..globals.primitive_count {
-			let mut temp_dist: f64 = 0.0;
-			let p = globals.primitive_list[i as usize];
+    // Make the ray bounce off every sphere 
+    for i in 0..globals.primitive_count {
+        let mut temp_dist: f64 = 0.0;
+        let p = globals.primitive_list[i as usize];
 
-			let res = p.intersect(ray, &mut temp_dist);
+        let res = p.intersect(*ray, &mut temp_dist);
 
-			if res == 0 {
-				continue;
-			}
+        if res == 0 {
+            continue;
+        }
 
-			if temp_dist < dist {
-				prim = Some(p);
-				dist = temp_dist;
-				// result = ret;
-			}
-		}
+        if temp_dist < dist {
+            prim = Some(p);
+            dist = temp_dist;
+            // result = ret;
+        }
+    }
 
-		match prim {
-			Some(_) => {},
-			None => {
-				let ret_vector = Vector3D{
-					x: color.x,
-					y: color.y,
-					z: color.z,
-				};
+    match prim {
+        Some(_) => {},
+        None => {
+            let ret_vector = Vector3D{
+                x: color.x,
+                y: color.y,
+                z: color.z,
+            };
 
-				return ret_vector;
-			}
-		}
+            return ret_vector;
+        }
+    }
 
-		let prim = prim.unwrap();
+    let prim = prim.unwrap();
 
-		let mut pi = Vector3D::v3d_new((ray.direction.x, ray.direction.y, ray.direction.z));
-		pi.v3d_mul_scalar(dist);
-		pi.v3d_add(ray.origin);
+    let mut pi = ray.direction;
+    pi.v3d_mul_scalar(dist);
+    pi.v3d_add(ray.origin);
 
-		let prim_color: Vector3D = prim.m.color;
+    let prim_color: Vector3D = prim.m.color;
 
-		for i in 0..globals.light_count {
-			let light_iter = &globals.light_list[i as usize];
+    for i in 0..globals.light_count {
+        let light_iter = globals.light_list[i as usize];
 
-			let mut l: Vector3D = light_iter.position;
-			l.v3d_sub(pi);
-			l.v3d_norm();
+        let mut l: Vector3D = light_iter.position;
+        l.v3d_sub(pi);
+        l.v3d_norm();
 
-			let n: Vector3D = prim.normal(pi);
-			
-			if prim.m.diffusive > 0.0 {
-				let dot = l.v3d_dot_mul(n);
-				if dot > 0.0 {
-					let diff = dot * prim.m.diffusive;
+        let n: Vector3D = prim.normal(pi);
+        
+        if prim.m.diffusive > 0.0 {
+            let dot = l.v3d_dot_mul(n);
+            if dot > 0.0 {
+                let diff = dot * prim.m.diffusive;
 
-					let mut color_add = light_iter.color;
-					color_add.v3d_mul_v3d(prim_color);
-					color_add.v3d_mul_scalar(diff);
-					color.v3d_add(color_add);
+                //color += ((lightiter)->Color * prim_color) * diff;
+                let mut color_add = light_iter.color;
+                color_add.v3d_mul_v3d(prim_color);
+                color_add.v3d_mul_scalar(diff);
+                color.v3d_add(color_add);
 
-					//color += ((lightiter)->Color * prim_color) * diff;
-				}
+            }
+        }
 
-				if prim.m.specular > 0.0 {
-					//FIXME: Maybe this is messed up.
+        if prim.m.specular > 0.0 {
+            //FIXME: Maybe this is messed up.
 
-					let mut r1: Vector3D = n;
-					let r2: f64 = l.v3d_dot_mul(n) * 2.0;
-                    r1.v3d_mul_scalar(r2);
-					let mut r: Vector3D = l;
-					r.v3d_sub(r1);
+            // R = L -  N * L.Dot(N) * 2.0l;
+            let mut r1: Vector3D = n;
+            let r2: f64 = l.v3d_dot_mul(n) * 2.0;
+            r1.v3d_mul_scalar(r2);
+            let mut r: Vector3D = l;
+            r.v3d_sub(r1);
 
-					let mut dot: f64 = ray.direction.v3d_dot_mul(r);
-					if dot > 0.0 {
-						dot *= dot;
-						dot *= dot;
-						dot *= dot;
-						let spec = dot * prim.m.specular;
+            let mut dot: f64 = ray.direction.v3d_dot_mul(r);
+            if dot > 0.0 {
+                dot *= dot;
+                dot *= dot;
+                dot *= dot;
+                let spec = dot * prim.m.specular;
 
-						let mut color_add = light_iter.color;
-						color_add.v3d_mul_scalar(spec);
-						color_add.v3d_add(color_add);
-					}
-					// R = L -  N * L.Dot(N) * 2.0l;
-				}
+                let mut color_add = light_iter.color;
+                color_add.v3d_mul_scalar(spec);
+                color.v3d_add(color_add);
+            }
+        }
 
-				let refl = prim.m.reflective;
-				if refl > 0.0 && refl_depth < 4 {
-					prim.normal(pi);
+        let refl = prim.m.reflective;
+        if refl > 0.0 && refl_depth < 4 {
+            prim.normal(pi);
 
 
-					let mut r: Vector3D = ray.direction;
-					let mut r1: Vector3D = n;
+            let mut r: Vector3D = ray.direction;
+            let mut r1: Vector3D = n;
 
-					let r2 = ray.direction.v3d_dot_mul(n) * 2.0;
-					r1.v3d_mul_scalar(r2);
-					r.v3d_sub(r1);
+            let r2 = ray.direction.v3d_dot_mul(n) * 2.0;
+            r1.v3d_mul_scalar(r2);
+            r.v3d_sub(r1);
 
-					let mut newpi: Vector3D = r;
-					newpi.v3d_mul_scalar(0.0001);
-					newpi.v3d_add(pi);
+            // newpi = pi + r * 0.0001
+            let mut newpi: Vector3D = r;
+            newpi.v3d_mul_scalar(0.0001);
+            newpi.v3d_add(pi);
 
-					let tempr: Ray = Ray {
-						origin: newpi,
-						direction: r,
-					};
+            let tempr: Ray = Ray {
+                origin: newpi,
+                direction: r,
+            };
 
-					let mut rcol:Vector3D = trace(tempr, refl_depth +1, globals);
+            let mut rcol:Vector3D = trace(&tempr, refl_depth +1, globals);
 
-					rcol.v3d_mul_scalar(refl);
-					rcol.v3d_mul_v3d(prim_color);
-					color.v3d_add(rcol);
-				}
-			}
-		}
+            rcol.v3d_mul_scalar(refl);
+            rcol.v3d_mul_v3d(prim_color);
+            color.v3d_add(rcol);
+        }
+    }
 
-		let ret_vector: Vector3D = Vector3D {
-			x: color.x,
-			y: color.y,
-			z: color.z,
-		};
+    let ret_vector: Vector3D = Vector3D {
+        x: color.x,
+        y: color.y,
+        z: color.z,
+    };
 
-		return ret_vector;
+    return ret_vector;
 }
 
 fn render(thread_id: u32, globals: &mut GlobalSettings) {
     let camerapos = Vector3D::v3d_new((0.0, 0.0, -5.0));
 
-    let wx1: f64 = -2.0;
-    let wx2: f64 = 2.0;
-    let wy1: f64 = 1.5;
-    let wy2: f64 = -1.5;
+    let wx1: f64 = -2.0; let wx2: f64 = 2.0; 
+    let wy1: f64 = 1.5; let wy2: f64 = -1.5;
 
     let dx: f64 = (wx2 - wx1) as f64 / (globals.img.width()) as f64;
     let dy: f64 = (wy2 - wy1) as f64 / (globals.img.height()) as f64;
 
-    let mut sx: f64 = wx1;
     let mut sy: f64 = wy1 + dy * (thread_id as f64);
 
     for y in (thread_id..globals.img.height()).step_by(MAXTHREADS as usize) {
-        sx = wx1;
+        let mut sx = wx1;
 
         for x in 0..globals.img.width() {
             let camera_target = Vector3D::v3d_new((sx, sy, 0.0));
@@ -375,10 +375,30 @@ fn render(thread_id: u32, globals: &mut GlobalSettings) {
             ray.direction.v3d_sub(ray.origin);
             ray.direction.v3d_norm();
 
-            let color: Vector3D = trace(ray, 0, globals);
-            let r: u8 = (color.x * 255.0) as u8;
-            let g: u8 = (color.y * 255.0) as u8;
-            let b: u8 = (color.z * 255.0) as u8;
+            // Trace the ray
+            let color: Vector3D = trace(&ray, 0, globals);
+
+
+            // Normalize colors
+            let r: i32 = (color.x * 255.0) as i32;
+            let g: i32 = (color.y * 255.0) as i32;
+            let b: i32 = (color.z * 255.0) as i32;
+
+            let r: u8 = match r {
+                r if r > 255 => 255,
+                r if r < 0 => 0,
+                _ => r as u8,
+            };
+            let g: u8 = match g {
+                g if g > 255 => 255,
+                g if g < 0 => 0,
+                _ => g as u8,
+            };
+            let b: u8 = match b {
+                b if b > 255 => 255,
+                b if b < 0 => 0,
+                _ => b as u8,
+            };
 
             let cl: image::Rgba<u8> = image::Rgba([r, g, b, 255]);
             globals.img.put_pixel(x, y, cl);
@@ -427,7 +447,7 @@ fn main() {
         reflective: 0.4,
     };
 
-    // Use a single `Vec<char>` here, maybe
+    // FIXME: Use a single `Vec<char>` here, maybe
     // All this because Rust can't index into strings :)))))))))))
     let mut sphere_pos_map: Vec<Vec<char>> = Vec::new();
     sphere_pos_map.push(".........".chars().collect());
@@ -437,12 +457,7 @@ fn main() {
     sphere_pos_map.push(".ggg.rrr.".chars().collect());
     sphere_pos_map.push(".........".chars().collect());
 
-    let mut sphere_pos: Vector3D = Vector3D {
-        x: 0.0,
-        y: 0.0,
-        z: 0.0,
-    };
-
+    // Place colored spheres here and there.
     for j in 0..6 {
         for i in 0..9 {
             let mut m = &mirror;
@@ -451,24 +466,25 @@ fn main() {
 
             match sphere_pos_map[j][i] {
                 'g' => {
-                    z += -0.5 - sn * 0.4;
+                    z += -0.5 /*- sn * 0.4 */;
                     m = &green;
-                }
+                },
                 'r' => {
-                    z += -0.5 - sn * 0.4;
+                    z += -0.5 /* - sn * 0.4 */;
                     m = &red;
-                }
+                },
 
                 _ => {
                     z += sn;
-                }
+                },
             }
 
-            sphere_pos.v3d_update((-2.0 + (i as f64) * 0.5, 1.25 - (j as f64) * 0.5, z));
+            let sphere_pos = Vector3D::v3d_new((-2.0 + (i as f64) * 0.5, 1.25 - (j as f64) * 0.5, z));
             add_sphere(&sphere_pos, 0.25, m, &mut globals);
         }
     }
 
+    
     let lightpos: Vector3D = Vector3D::v3d_new((0.0, 0.0, 0.0));
     let lightcolor: Vector3D = Vector3D::v3d_new((2.0, 2.0, 2.0));
     add_light(lightpos, lightcolor, &mut globals);
@@ -481,8 +497,6 @@ fn main() {
     render(2, &mut globals);
     render(3, &mut globals);
 
-
     println!("Writing test.png image...");
     globals.img.save("test.png").unwrap();
 }
-
