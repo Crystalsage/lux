@@ -1,7 +1,12 @@
 // A very simple ray tracer by Bourbon
 // Assume BSD-style license
 //
-// PRIM := Primitive (Sphere here)
+// The images in the 'renders' folder are results of experiments with the
+// camera's position (`camerapos` variable in `Render` function).
+//
+// ----------------------------------------------------------------------------
+//
+// PRIM is for a primitive (Sphere here)
 
 use image::{ImageBuffer, RgbaImage};
 
