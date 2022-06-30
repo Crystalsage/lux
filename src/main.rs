@@ -1,18 +1,20 @@
 // A very simple ray tracer by Bourbon
 // Assume BSD-style license
+//
+// PRIM := Primitive (Sphere here)
 
 use image::{ImageBuffer, RgbaImage};
 
 // Global constants
 // `u32` for compatibility with 
-const RESX: u32 = 1024;
-const RESY: u32 = 768;
+const RESX: u32 = 1920;
+const RESY: u32 = 1080;
 const MAXPRIMCOUNT: u32 = 64;
 const MAXLIGHTCOUNT: u32 = 10;
 const MAXTHREADS: u32 = 4;
 
 // Three dimensional vector
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 struct Vector3D {
     x: f64,
     y: f64,
@@ -28,13 +30,6 @@ impl Vector3D {
             y: coordinates.1,
             z: coordinates.2,
         }
-    }
-
-    // Set coordinates on vector
-    fn v3d_update(&mut self, coordinates: (f64, f64, f64)) {
-        self.x = coordinates.0;
-        self.y = coordinates.1;
-        self.z = coordinates.2;
     }
 
     // Clone `original_vector` into new vector `self`
@@ -135,7 +130,7 @@ struct Ray {
     origin: Vector3D,
 }
 
-#[derive(Copy, Debug, Clone)]
+#[derive(Copy, Clone)]
 // Light source
 struct Light {
     position: Vector3D,
@@ -154,6 +149,7 @@ struct GlobalSettings {
     light_list: Vec<Light>,
 }
 
+// Methods for `Prim` 
 impl PrimSphere{
 	fn normal(&self, pos: Vector3D) -> Vector3D {
 		let mut ret = pos;
@@ -208,6 +204,8 @@ fn add_sphere(pos: &Vector3D, rad: f64, m: &Material, globals: &mut GlobalSettin
     }
 }
 
+// Spawn a light source at the specified position `pos`. Call this less than 
+// the `MAXLIGHTCOUNT` times in `main` to add more light sources.
 fn add_light(pos: Vector3D, color: Vector3D, globals: &mut GlobalSettings) {
     if globals.light_count < MAXLIGHTCOUNT {
         let l = Light {
@@ -220,6 +218,7 @@ fn add_light(pos: Vector3D, color: Vector3D, globals: &mut GlobalSettings) {
     }
 }
 
+// Trace the ray
 fn trace(ray: &Ray, refl_depth: u32, globals: &mut GlobalSettings) -> Vector3D{
     let mut color: Vector3D = Vector3D::v3d_new((0.02, 0.1, 0.17));
 
@@ -350,6 +349,7 @@ fn trace(ray: &Ray, refl_depth: u32, globals: &mut GlobalSettings) -> Vector3D{
     return ret_vector;
 }
 
+// Boss function
 fn render(thread_id: u32, globals: &mut GlobalSettings) {
     let camerapos = Vector3D::v3d_new((0.0, 0.0, -5.0));
 
@@ -361,6 +361,7 @@ fn render(thread_id: u32, globals: &mut GlobalSettings) {
 
     let mut sy: f64 = wy1 + dy * (thread_id as f64);
 
+    // Spawn rays
     for y in (thread_id..globals.img.height()).step_by(MAXTHREADS as usize) {
         let mut sx = wx1;
 
@@ -426,6 +427,7 @@ fn main() {
         light_list,
     };
 
+    // Set three materials here.
     let mirror = Material {
         color: Vector3D::v3d_new((0.6, 0.6, 0.6)),
         specular: 0.3,
@@ -449,13 +451,17 @@ fn main() {
 
     // FIXME: Use a single `Vec<char>` here, maybe
     // All this because Rust can't index into strings :)))))))))))
+    // ----
+    // Position of spheres in the image. Edit this to alter the sphere pattern.
+    // But make sure that you enter 9 x 6 pattern. Otherwise, change the 
+    // `j` and `i` in the iterator below for a custom map.
     let mut sphere_pos_map: Vec<Vec<char>> = Vec::new();
-    sphere_pos_map.push(".........".chars().collect());
-    sphere_pos_map.push(".ggg.....".chars().collect());
-    sphere_pos_map.push(".g...rrr.".chars().collect());
-    sphere_pos_map.push(".g.g.r.r.".chars().collect());
-    sphere_pos_map.push(".ggg.rrr.".chars().collect());
-    sphere_pos_map.push(".........".chars().collect());
+    sphere_pos_map.push("g..g..r..".chars().collect());
+    sphere_pos_map.push("g..g.....".chars().collect());
+    sphere_pos_map.push("gggg..r..".chars().collect());
+    sphere_pos_map.push("g..g..r..".chars().collect());
+    sphere_pos_map.push("g..g..r..".chars().collect());
+    sphere_pos_map.push("......r..".chars().collect());
 
     // Place colored spheres here and there.
     for j in 0..6 {
@@ -484,12 +490,13 @@ fn main() {
         }
     }
 
-    
+    // Add a single light source  
     let lightpos: Vector3D = Vector3D::v3d_new((0.0, 0.0, 0.0));
     let lightcolor: Vector3D = Vector3D::v3d_new((2.0, 2.0, 2.0));
     add_light(lightpos, lightcolor, &mut globals);
 
     println!("Rendering...\n");
+
     // Simulating 4 threads. Each 'thread' (call) completes a part of the image. 
     // FIXME: Actually implement threads! :')
     render(0, &mut globals);
